@@ -1,0 +1,23 @@
+# Build and Output Directories
+bin/
+obj/
+publish/
+dist/
+
+# Visual Studio / Rider / VS Code cache & settings
+.vs/
+.vscode/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Operating System & Diagnostics
+*.log
+*.tmp
+Thumbs.db
+[Dd]esktop.ini
+
+# Packages
+*.nupkg
+packages/

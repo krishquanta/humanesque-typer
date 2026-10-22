@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Humanesque/Humanesque.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Humanesque.Tests/Humanesque.Tests.csproj" />
+  </Folder>
+</Solution>
