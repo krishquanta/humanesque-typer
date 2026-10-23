@@ -52,10 +52,6 @@ public class BackgroundTypingIntegrationTests
             var targetInfo = WindowTargetHelper.FromHandle(hWnd);
             Assert.NotNull(targetInfo);
 
-            IntPtr targetEditHandle = targetInfo.EditControlHandle != IntPtr.Zero
-                ? targetInfo.EditControlHandle
-                : targetInfo.Handle;
-
             // 3. Configure a fast profile with 0% typos for determinism
             var fastProfile = new TypingProfile
             {
@@ -67,24 +63,24 @@ public class BackgroundTypingIntegrationTests
                 TypoRatePercent = 0.0,
                 MinOvertypeCount = 1,
                 MaxOvertypeCount = 2,
-                ReactionDelayMinMs = 50,
-                ReactionDelayMaxMs = 100,
-                BackspaceDelayMinMs = 20,
-                BackspaceDelayMaxMs = 40,
+                ReactionDelayMinMs = 10,
+                ReactionDelayMaxMs = 20,
+                BackspaceDelayMinMs = 5,
+                BackspaceDelayMaxMs = 10,
                 CommonWordBurstFactor = 0.5,
-                CommaPauseMinMs = 20,
-                CommaPauseMaxMs = 50,
-                PeriodPauseMinMs = 40,
-                PeriodPauseMaxMs = 80,
-                ParagraphPauseMinMs = 50,
-                ParagraphPauseMaxMs = 100
+                CommaPauseMinMs = 5,
+                CommaPauseMaxMs = 10,
+                PeriodPauseMinMs = 10,
+                PeriodPauseMaxMs = 20,
+                ParagraphPauseMinMs = 10,
+                ParagraphPauseMaxMs = 20
             };
 
             var engine = new TypingEngine();
             string testSentence = "Humanesque background typing test successful.";
 
-            // 4. Run typing into the background Notepad window
-            await engine.StartTypingAsync(testSentence, targetEditHandle, fastProfile);
+            // 4. Run typing into the target window
+            await engine.StartTypingAsync(testSentence, targetInfo, fastProfile, countdownSeconds: 0);
 
             Assert.Equal(TypingEngineState.Completed, engine.State);
         }

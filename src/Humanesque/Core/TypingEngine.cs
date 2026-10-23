@@ -7,6 +7,7 @@ namespace Humanesque.Core;
 public enum TypingEngineState
 {
     Idle,
+    CountingDown,
     Running,
     Paused,
     Completed,
@@ -25,9 +26,11 @@ public class TypingEngine
     private Stopwatch _sessionStopwatch = new();
 
     public TypingEngineState State { get; private set; } = TypingEngineState.Idle;
+    public InputDispatcher Dispatcher => _dispatcher;
 
     public event Action<SessionStats>? ProgressUpdated;
     public event Action<TypingEngineState>? StateChanged;
+    public event Action<int>? CountdownTick;
 
     public void Pause()
     {
@@ -53,7 +56,7 @@ public class TypingEngine
 
     public void Abort()
     {
-        if (State == TypingEngineState.Running || State == TypingEngineState.Paused)
+        if (State == TypingEngineState.Running || State == TypingEngineState.Paused || State == TypingEngineState.CountingDown)
         {
             _cts?.Cancel();
             _pauseEvent.Set();
@@ -63,12 +66,38 @@ public class TypingEngine
         }
     }
 
-    public async Task StartTypingAsync(string text, IntPtr targetHandle, TypingProfile profile)
+    public async Task StartTypingAsync(string text, TargetWindowInfo target, TypingProfile profile, int countdownSeconds = 3)
     {
-        if (string.IsNullOrEmpty(text) || targetHandle == IntPtr.Zero) return;
+        if (string.IsNullOrEmpty(text) || target.Handle == IntPtr.Zero) return;
 
         _cts = new CancellationTokenSource();
         _pauseEvent.Set();
+        var token = _cts.Token;
+
+        // Initialize and prepare injection channel
+        _dispatcher.PrepareTarget(target);
+
+        // If using FocusSendInput mode or auto-detecting a non-Word window, give a clean countdown and focus window
+        bool requiresFocus = _dispatcher.ActiveMode == InjectionMode.FocusSendInput ||
+                             (_dispatcher.ActiveMode == InjectionMode.AutoDetect && !target.ProcessName.Equals("WINWORD", StringComparison.OrdinalIgnoreCase));
+
+        if (requiresFocus && countdownSeconds > 0)
+        {
+            State = TypingEngineState.CountingDown;
+            StateChanged?.Invoke(State);
+
+            for (int s = countdownSeconds; s > 0; s--)
+            {
+                token.ThrowIfCancellationRequested();
+                CountdownTick?.Invoke(s);
+                await Task.Delay(1000, token);
+            }
+
+            // Bring target window to foreground
+            InputDispatcher.ActivateWindow(target.Handle);
+            await Task.Delay(250, token);
+        }
+
         _sessionStopwatch.Restart();
         State = TypingEngineState.Running;
         StateChanged?.Invoke(State);
@@ -86,7 +115,6 @@ public class TypingEngine
         await Task.Run(() =>
         {
             int index = 0;
-            var token = _cts.Token;
 
             try
             {
@@ -105,7 +133,7 @@ public class TypingEngine
 
                         // 1. Dispatch the erroneous spatial neighbor
                         char typoChar = _typoEngine.GenerateTypoCharacter(intendedChar);
-                        _dispatcher.PostChar(targetHandle, typoChar);
+                        _dispatcher.DispatchChar(target, typoChar);
 
                         int delay = _cadence.CalculateKeyInterval(typoChar, text, index, profile);
                         HighResolutionTimer.Delay(delay, token);
@@ -121,7 +149,7 @@ public class TypingEngine
 
                             char nextChar = text[index + 1 + overtyped];
                             _stateMachine.RecordOvertype(nextChar);
-                            _dispatcher.PostChar(targetHandle, nextChar);
+                            _dispatcher.DispatchChar(target, nextChar);
 
                             int overDelay = _cadence.CalculateKeyInterval(nextChar, text, index + 1 + overtyped, profile);
                             HighResolutionTimer.Delay(overDelay, token);
@@ -140,7 +168,7 @@ public class TypingEngine
                             token.ThrowIfCancellationRequested();
                             _pauseEvent.Wait(token);
 
-                            _dispatcher.PostBackspace(targetHandle);
+                            _dispatcher.DispatchBackspace(target);
                             stats.BackspacesDispatched++;
 
                             int backspaceDelay = _cadence.GetBackspaceInterval(profile);
@@ -158,7 +186,7 @@ public class TypingEngine
                             _pauseEvent.Wait(token);
 
                             char replayChar = replayChars[r];
-                            _dispatcher.PostChar(targetHandle, replayChar);
+                            _dispatcher.DispatchChar(target, replayChar);
 
                             stats.CharactersTyped++;
                             UpdateTelemetry(stats);
@@ -173,7 +201,7 @@ public class TypingEngine
                     else
                     {
                         // Standard keystroke dispatch
-                        _dispatcher.PostChar(targetHandle, intendedChar);
+                        _dispatcher.DispatchChar(target, intendedChar);
                         stats.CharactersTyped++;
                         index++;
 
@@ -198,7 +226,7 @@ public class TypingEngine
             {
                 _sessionStopwatch.Stop();
             }
-        });
+        }, token);
     }
 
     private void UpdateTelemetry(SessionStats stats)
@@ -208,7 +236,6 @@ public class TypingEngine
 
         if (elapsedMinutes > 0.005)
         {
-            // Standard typing WPM: (characters / 5) / minutes
             stats.CurrentWpm = Math.Round((stats.CharactersTyped / 5.0) / elapsedMinutes, 1);
             stats.AverageWpm = stats.CurrentWpm;
 

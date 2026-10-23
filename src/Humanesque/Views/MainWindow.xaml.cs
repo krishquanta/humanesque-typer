@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Interop;
 using Humanesque.Models;
 using Humanesque.Native;
@@ -82,6 +83,20 @@ public partial class MainWindow : Window
         if (DataContext is MainViewModel vm)
         {
             vm.ActiveProfile = TypingProfile.CreateFast();
+        }
+    }
+
+    private void OnInjectionModeChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (DataContext is MainViewModel vm && ComboMode.SelectedItem is ComboBoxItem item)
+        {
+            string? tag = item.Tag as string;
+            vm.ActiveInjectionMode = tag switch
+            {
+                "WordComBackground" => InjectionMode.WordComBackground,
+                "FocusSendInput" => InjectionMode.FocusSendInput,
+                _ => InjectionMode.AutoDetect
+            };
         }
     }
 

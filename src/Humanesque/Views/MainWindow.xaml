@@ -4,10 +4,11 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:vm="clr-namespace:Humanesque.ViewModels"
+        xmlns:native="clr-namespace:Humanesque.Native"
         mc:Ignorable="d"
         Title="Humanesque Typer — Biomimetic Background Autotyper" 
-        Height="720" Width="960"
-        MinHeight="600" MinWidth="800"
+        Height="780" Width="1020"
+        MinHeight="650" MinWidth="850"
         WindowStartupLocation="CenterScreen"
         Background="{StaticResource BgDark}">
 
@@ -15,28 +16,86 @@
         <vm:MainViewModel/>
     </Window.DataContext>
 
+    <Window.Resources>
+        <!-- Custom High-Contrast ComboBox Item Style -->
+        <Style x:Key="HighContrastComboBoxItemStyle" TargetType="ComboBoxItem">
+            <Setter Property="Background" Value="#1C1C22"/>
+            <Setter Property="Foreground" Value="#FFFFFF"/>
+            <Setter Property="Padding" Value="10,8"/>
+            <Setter Property="BorderThickness" Value="0,0,0,1"/>
+            <Setter Property="BorderBrush" Value="#2A2A35"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBoxItem">
+                        <Border x:Name="ItemBorder" 
+                                Background="{TemplateBinding Background}" 
+                                BorderBrush="{TemplateBinding BorderBrush}" 
+                                BorderThickness="{TemplateBinding BorderThickness}" 
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Stretch" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="ItemBorder" Property="Background" Value="#2D2D3E"/>
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="ItemBorder" Property="Background" Value="#3730A3"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- DataTemplate for Window Items in Dropdown -->
+        <DataTemplate x:Key="WindowItemTemplate">
+            <Grid Margin="2">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Process Name Badge -->
+                <Border Background="#312E81" BorderBrush="#4338CA" BorderThickness="1" CornerRadius="4" Padding="6,2" Margin="0,0,12,0" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding ProcessName}" FontWeight="Bold" Foreground="#A5B4FC" FontSize="11"/>
+                </Border>
+
+                <!-- Window Title -->
+                <TextBlock Grid.Column="1" Text="{Binding WindowTitle}" FontWeight="SemiBold" Foreground="#FFFFFF" FontSize="13" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+
+                <!-- PID & Handle -->
+                <TextBlock Grid.Column="2" Foreground="#94A3B8" FontSize="11" VerticalAlignment="Center" Margin="12,0,4,0">
+                    <Run Text="PID: "/><Run Text="{Binding ProcessId, Mode=OneWay}" FontWeight="Bold" Foreground="#CBD5E1"/>
+                </TextBlock>
+            </Grid>
+        </DataTemplate>
+    </Window.Resources>
+
     <Grid Margin="24">
         <Grid.RowDefinitions>
             <!-- 0: Header & Target Selection -->
             <RowDefinition Height="Auto"/>
-            <!-- 1: Profile Selector -->
+            <!-- 1: Profile & Injection Strategy -->
             <RowDefinition Height="Auto"/>
             <!-- 2: Document Input Area -->
             <RowDefinition Height="*"/>
-            <!-- 3: Action Controls -->
+            <!-- 3: Action Controls & Status Banner -->
             <RowDefinition Height="Auto"/>
             <!-- 4: Telemetry & Progress -->
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <!-- 0: Header & Target Window Selection -->
-        <Border Grid.Row="0" Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderDark}" BorderThickness="1" CornerRadius="8" Padding="16" Margin="0,0,0,16">
+        <!-- 0: Target Window Selection Card -->
+        <Border Grid.Row="0" Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderDark}" BorderThickness="1" CornerRadius="8" Padding="16" Margin="0,0,0,14">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
+                <!-- Top bar in card -->
                 <Grid Grid.Row="0" Margin="0,0,0,10">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
@@ -44,36 +103,48 @@
                     </Grid.ColumnDefinitions>
 
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <TextBlock Text="🎯 TARGET WINDOW:" FontWeight="Bold" FontSize="13" Foreground="{StaticResource AccentPrimary}" VerticalAlignment="Center" Margin="0,0,12,0"/>
-                        <TextBlock Text="Types into this window in the background without stealing focus" FontSize="12" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+                        <TextBlock Text="🎯 TARGET WINDOW" FontWeight="Bold" FontSize="13" Foreground="{StaticResource AccentPrimary}" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                        <TextBlock Text="Choose which window will receive the human-cadenced typing" FontSize="12" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
                     </StackPanel>
 
                     <StackPanel Grid.Column="1" Orientation="Horizontal">
-                        <Button Content="🔄 Refresh" Command="{Binding RefreshWindowsCommand}" Background="{StaticResource BgCardHover}" Margin="0,0,8,0" Padding="10,6" FontSize="12"/>
-                        <Button Content="🔒 Lock Active (Ctrl+Shift+T)" Click="OnLockActiveClicked" Background="{StaticResource BgCardHover}" Padding="10,6" FontSize="12"/>
+                        <Button Content="🔄 Refresh List" Command="{Binding RefreshWindowsCommand}" Background="{StaticResource BgCardHover}" Margin="0,0,8,0" Padding="10,6" FontSize="12"/>
+                        <Button Content="🔒 Lock Active Window (Ctrl+Shift+T)" Click="OnLockActiveClicked" Background="{StaticResource BgCardHover}" Padding="10,6" FontSize="12"/>
                     </StackPanel>
                 </Grid>
 
+                <!-- Window Dropdown -->
                 <Grid Grid.Row="1">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
 
+                    <!-- Beautifully styled, high-contrast ComboBox -->
                     <ComboBox ItemsSource="{Binding AvailableWindows}" 
                               SelectedItem="{Binding SelectedWindow}" 
-                              DisplayMemberPath="DisplayText"
-                              Background="{StaticResource BgDark}"
-                              Foreground="{StaticResource TextPrimary}"
+                              ItemTemplate="{StaticResource WindowItemTemplate}"
+                              ItemContainerStyle="{StaticResource HighContrastComboBoxItemStyle}"
+                              Background="#181822"
+                              Foreground="#FFFFFF"
+                              BorderBrush="#4F46E5"
+                              BorderThickness="1.5"
                               Padding="10,8" 
-                              FontSize="13"/>
+                              FontSize="13">
+                        <ComboBox.Resources>
+                            <!-- Override Dropdown Popup Background to Dark Card -->
+                            <SolidColorBrush x:Key="{x:Static SystemColors.WindowBrushKey}" Color="#181822" />
+                            <SolidColorBrush x:Key="{x:Static SystemColors.WindowTextBrushKey}" Color="#FFFFFF" />
+                        </ComboBox.Resources>
+                    </ComboBox>
 
-                    <Border Grid.Column="1" Background="{StaticResource BgDark}" CornerRadius="4" Padding="10,6" Margin="10,0,0,0">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="PID: " Foreground="{StaticResource TextSecondary}" FontSize="12"/>
-                            <TextBlock Text="{Binding SelectedWindow.ProcessId}" FontWeight="SemiBold" FontSize="12" Margin="0,0,12,0"/>
-                            <TextBlock Text="Class: " Foreground="{StaticResource TextSecondary}" FontSize="12"/>
-                            <TextBlock Text="{Binding SelectedWindow.ClassName}" FontWeight="SemiBold" FontSize="12"/>
+                    <!-- Selected Window Info Badge -->
+                    <Border Grid.Column="1" Background="#14141A" BorderBrush="{StaticResource BorderDark}" BorderThickness="1" CornerRadius="6" Padding="12,6" Margin="10,0,0,0">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Text="Target Handle: " Foreground="{StaticResource TextSecondary}" FontSize="12"/>
+                            <TextBlock Text="{Binding SelectedWindow.Handle, StringFormat='{}0x{0:X}'}" FontWeight="Bold" Foreground="{StaticResource StatusSuccess}" FontSize="12" Margin="0,0,12,0"/>
+                            <TextBlock Text="Process: " Foreground="{StaticResource TextSecondary}" FontSize="12"/>
+                            <TextBlock Text="{Binding SelectedWindow.ProcessName}" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" FontSize="12"/>
                         </StackPanel>
                     </Border>
                 </Grid>
@@ -81,7 +152,7 @@
         </Border>
 
         <!-- 1: Mode & Profile Selector -->
-        <Border Grid.Row="1" Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderDark}" BorderThickness="1" CornerRadius="8" Padding="14,12" Margin="0,0,0,16">
+        <Border Grid.Row="1" Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderDark}" BorderThickness="1" CornerRadius="8" Padding="14,12" Margin="0,0,0,14">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
@@ -89,11 +160,10 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
-                <TextBlock Text="⚡ TYPING MODE:" FontWeight="Bold" FontSize="13" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="0,0,20,0"/>
+                <TextBlock Text="⚡ TYPING SPEED:" FontWeight="Bold" FontSize="13" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="0,0,20,0"/>
 
                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                     <RadioButton Content="Slow (~30 WPM)" 
-                                 IsChecked="{Binding ActiveProfile.Id, Converter={x:Null}, Mode=OneWay}" 
                                  Click="OnSelectSlowProfile"
                                  Foreground="{StaticResource TextPrimary}" Margin="0,0,24,0" VerticalAlignment="Center"/>
                     <RadioButton Content="Average (~60 WPM)" 
@@ -105,12 +175,14 @@
                                  Foreground="{StaticResource TextPrimary}" Margin="0,0,24,0" VerticalAlignment="Center"/>
                 </StackPanel>
 
-                <Button Grid.Column="2" Content="⚙️ Settings &amp; Calibration" Click="OnOpenSettingsClicked" Background="{StaticResource BgCardHover}" Padding="12,6" FontSize="12"/>
+                <StackPanel Grid.Column="2" Orientation="Horizontal">
+                    <Button Content="⚙️ Settings &amp; Calibration" Click="OnOpenSettingsClicked" Background="{StaticResource BgCardHover}" Padding="12,6" FontSize="12"/>
+                </StackPanel>
             </Grid>
         </Border>
 
         <!-- 2: Document Input Area -->
-        <Grid Grid.Row="2" Margin="0,0,0,16">
+        <Grid Grid.Row="2" Margin="0,0,0,14">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
@@ -141,6 +213,7 @@
                              TextWrapping="Wrap"
                              VerticalScrollBarVisibility="Auto"
                              Background="Transparent"
+                             Foreground="#FFFFFF"
                              BorderThickness="0"
                              Padding="14"
                              FontSize="14"/>
@@ -156,42 +229,74 @@
             </Border>
         </Grid>
 
-        <!-- 3: Action Controls & Buttons -->
-        <Grid Grid.Row="3" Margin="0,0,0,16">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="*"/>
-            </Grid.ColumnDefinitions>
+        <!-- 3: Action Controls & Real-Time Status Banner -->
+        <Grid Grid.Row="3" Margin="0,0,0,14">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
 
-            <Button Content="▶  Start Typing" 
-                    Command="{Binding StartTypingCommand}" 
-                    IsEnabled="{Binding CanStart}"
-                    Background="{StaticResource AccentPrimary}"
-                    FontSize="14" Padding="28,12" Margin="0,0,12,0"/>
+            <!-- Buttons row -->
+            <Grid Grid.Row="0" Margin="0,0,0,10">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
 
-            <Button Grid.Column="1" 
-                    Content="{Binding IsPaused, Converter={x:Null}, FallbackValue='⏸  Pause (F8)'}" 
-                    Command="{Binding TogglePauseResumeCommand}" 
-                    IsEnabled="{Binding IsRunning}"
-                    Background="{StaticResource BgCardHover}"
-                    FontSize="14" Padding="20,12" Margin="0,0,12,0"/>
+                <Button Content="▶  Start Typing" 
+                        Command="{Binding StartTypingCommand}" 
+                        IsEnabled="{Binding CanStart}"
+                        Background="{StaticResource AccentPrimary}"
+                        FontSize="14" Padding="30,12" Margin="0,0,12,0"/>
 
-            <Button Grid.Column="2" 
-                    Content="⏹  Stop (F9 / Esc)" 
-                    Command="{Binding EmergencyAbortCommand}" 
-                    IsEnabled="{Binding IsRunning}"
-                    Background="{StaticResource StatusDanger}"
-                    FontSize="14" Padding="20,12" Margin="0,0,12,0"/>
+                <Button Grid.Column="1" 
+                        Content="⏸  Pause / Resume (F8)" 
+                        Command="{Binding TogglePauseResumeCommand}" 
+                        IsEnabled="{Binding IsRunning}"
+                        Background="{StaticResource BgCardHover}"
+                        FontSize="14" Padding="20,12" Margin="0,0,12,0"/>
 
-            <TextBlock Grid.Column="3" 
-                       Text="{Binding StatusMessage}" 
-                       Foreground="{StaticResource TextSecondary}" 
-                       FontSize="13" 
-                       VerticalAlignment="Center" 
-                       HorizontalAlignment="Right" 
-                       TextTrimming="CharacterEllipsis"/>
+                <Button Grid.Column="2" 
+                        Content="⏹  Stop (F9 / Esc)" 
+                        Command="{Binding EmergencyAbortCommand}" 
+                        IsEnabled="{Binding IsRunning}"
+                        Background="{StaticResource StatusDanger}"
+                        FontSize="14" Padding="20,12" Margin="0,0,12,0"/>
+
+                <!-- Injection Mode Selector -->
+                <StackPanel Grid.Column="3" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                    <TextBlock Text="Mode: " Foreground="{StaticResource TextSecondary}" FontSize="12" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                    <ComboBox x:Name="ComboMode" SelectionChanged="OnInjectionModeChanged" SelectedIndex="0" Background="#181822" Foreground="#FFFFFF" Padding="8,4" FontSize="12">
+                        <ComboBoxItem Content="🎯 Auto-Detect (Word COM / Focus)" Tag="AutoDetect"/>
+                        <ComboBoxItem Content="📝 Word Background COM" Tag="WordComBackground"/>
+                        <ComboBoxItem Content="⚡ Focus SendInput (Universal)" Tag="FocusSendInput"/>
+                    </ComboBox>
+                </StackPanel>
+            </Grid>
+
+            <!-- Prominent Status Banner -->
+            <Border Grid.Row="1" Background="#1A1A24" BorderBrush="{Binding StatusColor}" BorderThickness="1.5" CornerRadius="6" Padding="14,10">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Text="{Binding StatusMessage}" 
+                               Foreground="{Binding StatusColor}" 
+                               FontWeight="SemiBold" 
+                               FontSize="13" 
+                               VerticalAlignment="Center"/>
+
+                    <TextBlock Grid.Column="1" 
+                               Text="F8 = Pause/Resume | F9 = Abort | Ctrl+Shift+T = Lock Active" 
+                               Foreground="{StaticResource TextSecondary}" 
+                               FontSize="11" 
+                               VerticalAlignment="Center"/>
+                </Grid>
+            </Border>
         </Grid>
 
         <!-- 4: Telemetry & Progress -->
@@ -221,10 +326,13 @@
                         <TextBlock Text="Progress: " Foreground="{StaticResource TextSecondary}" FontSize="12"/>
                         <TextBlock Text="{Binding Stats.ProgressPercentage, StringFormat={}{0:F1}%}" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" FontSize="12" Margin="0,0,16,0"/>
 
+                        <TextBlock Text="Characters Typed: " Foreground="{StaticResource TextSecondary}" FontSize="12"/>
+                        <TextBlock Text="{Binding Stats.CharactersTyped}" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" FontSize="12" Margin="0,0,16,0"/>
+
                         <TextBlock Text="Live WPM: " Foreground="{StaticResource TextSecondary}" FontSize="12"/>
                         <TextBlock Text="{Binding Stats.CurrentWpm, StringFormat={}{0:F1}}" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" FontSize="12" Margin="0,0,16,0"/>
 
-                        <TextBlock Text="Typos Corrected: " Foreground="{StaticResource TextSecondary}" FontSize="12"/>
+                        <TextBlock Text="Typos Fixed: " Foreground="{StaticResource TextSecondary}" FontSize="12"/>
                         <TextBlock Text="{Binding Stats.TyposIntroduced}" FontWeight="Bold" Foreground="{StaticResource StatusSuccess}" FontSize="12" Margin="0,0,16,0"/>
 
                         <TextBlock Text="Elapsed: " Foreground="{StaticResource TextSecondary}" FontSize="12"/>
@@ -232,9 +340,9 @@
                     </StackPanel>
 
                     <TextBlock Grid.Column="1" 
-                               Text="Hotkeys: F8 = Pause/Resume | F9 = Abort | Ctrl+Shift+T = Lock Active" 
+                               Text="{Binding Stats.EstimatedTimeRemaining, StringFormat='{}Est. Remaining: {0:mm\\:ss}'}" 
                                Foreground="{StaticResource TextSecondary}" 
-                               FontSize="11" 
+                               FontSize="12" 
                                VerticalAlignment="Center"/>
                 </Grid>
             </Grid>
