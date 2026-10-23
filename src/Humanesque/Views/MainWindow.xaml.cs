@@ -94,8 +94,9 @@ public partial class MainWindow : Window
             vm.ActiveInjectionMode = tag switch
             {
                 "WordComBackground" => InjectionMode.WordComBackground,
+                "Win32MessageBackground" => InjectionMode.Win32MessageBackground,
                 "FocusSendInput" => InjectionMode.FocusSendInput,
-                _ => InjectionMode.AutoDetect
+                _ => InjectionMode.BackgroundAuto
             };
         }
     }

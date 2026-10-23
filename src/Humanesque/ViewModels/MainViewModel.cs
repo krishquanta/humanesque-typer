@@ -53,7 +53,7 @@ public partial class MainViewModel : ObservableObject
     private string _wordCountText = "0 words | 0 characters";
 
     [ObservableProperty]
-    private InjectionMode _activeInjectionMode = InjectionMode.AutoDetect;
+    private InjectionMode _activeInjectionMode = InjectionMode.BackgroundAuto;
 
     public MainViewModel()
     {
@@ -75,16 +75,8 @@ public partial class MainViewModel : ObservableObject
     {
         if (value != null)
         {
-            if (value.ProcessName.Equals("WINWORD", StringComparison.OrdinalIgnoreCase))
-            {
-                StatusMessage = $"Target: {value.DisplayText} (Direct Word COM Background Typing Available)";
-                StatusColor = "#818CF8";
-            }
-            else
-            {
-                StatusMessage = $"Target: {value.DisplayText} (Ready)";
-                StatusColor = "#10B981";
-            }
+            StatusMessage = $"Target: {value.DisplayText} — {value.BackgroundStrategyDescription}";
+            StatusColor = value.SupportsBackgroundTyping ? "#10B981" : "#818CF8";
         }
     }
 
@@ -162,7 +154,8 @@ public partial class MainViewModel : ObservableObject
 
         try
         {
-            await _engine.StartTypingAsync(DocumentText, SelectedWindow, ActiveProfile, countdownSeconds: 2);
+            int countdown = ActiveInjectionMode == InjectionMode.FocusSendInput ? 2 : 0;
+            await _engine.StartTypingAsync(DocumentText, SelectedWindow, ActiveProfile, countdownSeconds: countdown);
         }
         catch (Exception ex)
         {
@@ -237,7 +230,10 @@ public partial class MainViewModel : ObservableObject
                     IsRunning = true;
                     IsPaused = false;
                     CanStart = false;
-                    StatusMessage = $"▶ Typing into {SelectedWindow?.ProcessName}... (F8=Pause, F9=Stop)";
+                    string modeBadge = _engine.Dispatcher.ActiveMode == InjectionMode.FocusSendInput 
+                        ? "(Foreground Focus)" 
+                        : "(100% Background — You can Alt+Tab & multitask!)";
+                    StatusMessage = $"▶ Typing into {SelectedWindow?.ProcessName} {modeBadge} (F8=Pause, F9=Stop)";
                     StatusColor = "#10B981";
                     break;
                 case TypingEngineState.Paused:

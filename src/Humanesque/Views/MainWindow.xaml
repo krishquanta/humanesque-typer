@@ -269,9 +269,10 @@
                 <StackPanel Grid.Column="3" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                     <TextBlock Text="Mode: " Foreground="{StaticResource TextSecondary}" FontSize="12" VerticalAlignment="Center" Margin="0,0,8,0"/>
                     <ComboBox x:Name="ComboMode" SelectionChanged="OnInjectionModeChanged" SelectedIndex="0" Background="#181822" Foreground="#FFFFFF" Padding="8,4" FontSize="12">
-                        <ComboBoxItem Content="🎯 Auto-Detect (Word COM / Focus)" Tag="AutoDetect"/>
-                        <ComboBoxItem Content="📝 Word Background COM" Tag="WordComBackground"/>
-                        <ComboBoxItem Content="⚡ Focus SendInput (Universal)" Tag="FocusSendInput"/>
+                        <ComboBoxItem Content="✨ Background Mode (Recommended)" Tag="BackgroundAuto"/>
+                        <ComboBoxItem Content="📝 Word COM Background" Tag="WordComBackground"/>
+                        <ComboBoxItem Content="📩 Win32 Child Message" Tag="Win32MessageBackground"/>
+                        <ComboBoxItem Content="⚡ Foreground SendInput" Tag="FocusSendInput"/>
                     </ComboBox>
                 </StackPanel>
             </Grid>

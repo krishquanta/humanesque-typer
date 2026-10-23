@@ -92,8 +92,14 @@ public static class Win32Api
     public const uint MOD_NOREPEAT = 0x4000;
 
     public const int SW_RESTORE = 9;
+    public const int SW_SHOWNOACTIVATE = 4;
 
     public delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
+    public delegate bool EnumChildProc(IntPtr hWnd, IntPtr lParam);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool EnumChildWindows(IntPtr hWndParent, EnumChildProc lpEnumFunc, IntPtr lParam);
 
     [DllImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
@@ -184,6 +190,16 @@ public static class Win32Api
 
     [DllImport("winmm.dll", EntryPoint = "timeEndPeriod")]
     public static extern uint TimeEndPeriod(uint uPeriod);
+
+    public const uint OBJID_NATIVEOM = 0xFFFFFFF0;
+    public static readonly Guid IID_IDispatch = new("{00020400-0000-0000-C000-000000000046}");
+
+    [DllImport("oleacc.dll")]
+    public static extern int AccessibleObjectFromWindow(
+        IntPtr hwnd, 
+        uint dwId, 
+        ref Guid riid, 
+        [MarshalAs(UnmanagedType.IUnknown)] out object ppvObject);
 
     // OLE Active Object (for Microsoft Word background COM automation)
     [DllImport("ole32.dll")]

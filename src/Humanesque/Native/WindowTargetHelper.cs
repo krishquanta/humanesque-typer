@@ -50,17 +50,18 @@ public static class WindowTargetHelper
             Win32Api.GetClassName(hWnd, classBuilder, classBuilder.Capacity);
             string className = classBuilder.ToString();
 
-            IntPtr editHandle = ResolveEditControl(hWnd, className, processName);
+            var (editHandle, editClassName) = ResolveEditControl(hWnd, className, processName);
 
             windows.Add(new TargetWindowInfo
             {
                 Handle = hWnd,
                 EditControlHandle = editHandle,
+                EditControlClassName = editClassName,
                 WindowTitle = title,
                 ProcessName = processName,
                 ClassName = className,
                 ProcessId = (int)pid,
-                IsModernApp = className.Contains("Windows.UI.Core") || processName.Equals("Notepad", StringComparison.OrdinalIgnoreCase) && className.Contains("Notepad")
+                IsModernApp = className.Contains("Windows.UI.Core") || (processName.Equals("Notepad", StringComparison.OrdinalIgnoreCase) && className.Contains("Notepad"))
             });
 
             return true;
@@ -89,12 +90,13 @@ public static class WindowTargetHelper
         Win32Api.GetClassName(hWnd, classBuilder, classBuilder.Capacity);
         string className = classBuilder.ToString();
 
-        IntPtr editHandle = ResolveEditControl(hWnd, className, processName);
+        var (editHandle, editClassName) = ResolveEditControl(hWnd, className, processName);
 
         return new TargetWindowInfo
         {
             Handle = hWnd,
             EditControlHandle = editHandle,
+            EditControlClassName = editClassName,
             WindowTitle = titleBuilder.ToString(),
             ProcessName = processName,
             ClassName = className,
@@ -103,42 +105,88 @@ public static class WindowTargetHelper
         };
     }
 
-    public static IntPtr ResolveEditControl(IntPtr topHwnd, string className, string processName)
+    public static (IntPtr EditHandle, string EditClassName) ResolveEditControl(IntPtr topHwnd, string className, string processName)
     {
-        // 1. Classic Notepad uses "Edit" control
-        IntPtr childEdit = Win32Api.FindWindowEx(topHwnd, IntPtr.Zero, "Edit", null);
-        if (childEdit != IntPtr.Zero) return childEdit;
+        if (topHwnd == IntPtr.Zero) return (IntPtr.Zero, string.Empty);
 
-        // 2. Modern Windows 11 Notepad uses RichEditD2DPT
-        IntPtr richEdit = Win32Api.FindWindowEx(topHwnd, IntPtr.Zero, "RichEditD2DPT", null);
-        if (richEdit != IntPtr.Zero) return richEdit;
-
-        // 3. Microsoft Word uses "_WwG" for the active document view pane
+        // 1. If WINWORD, check for Word document pane "_WwG"
         if (processName.Equals("WINWORD", StringComparison.OrdinalIgnoreCase))
         {
-            IntPtr wordPane = FindChildRecursive(topHwnd, "_WwG");
-            if (wordPane != IntPtr.Zero) return wordPane;
+            IntPtr wordPane = IntPtr.Zero;
+            string wordCls = string.Empty;
+            Win32Api.EnumChildWindows(topHwnd, (child, _) =>
+            {
+                var sb = new StringBuilder(256);
+                Win32Api.GetClassName(child, sb, sb.Capacity);
+                string c = sb.ToString();
+                if (c.Equals("_WwG", StringComparison.OrdinalIgnoreCase))
+                {
+                    wordPane = child;
+                    wordCls = c;
+                    return false;
+                }
+                return true;
+            }, IntPtr.Zero);
+
+            if (wordPane != IntPtr.Zero) return (wordPane, wordCls);
         }
 
-        // 4. Default: target top-level handle directly
-        return topHwnd;
-    }
+        // 2. Enumerate all descendant controls to find rich edit, plain edit, scintilla, etc.
+        var candidates = new List<(IntPtr Hwnd, string ClassName, int Priority, bool Visible)>();
 
-    private static IntPtr FindChildRecursive(IntPtr parent, string targetClass)
-    {
-        IntPtr child = IntPtr.Zero;
-        while ((child = Win32Api.FindWindowEx(parent, child, null, null)) != IntPtr.Zero)
+        Win32Api.EnumChildWindows(topHwnd, (child, _) =>
         {
             var sb = new StringBuilder(256);
             Win32Api.GetClassName(child, sb, sb.Capacity);
-            if (sb.ToString().Equals(targetClass, StringComparison.OrdinalIgnoreCase))
-            {
-                return child;
-            }
+            string cls = sb.ToString();
+            bool visible = Win32Api.IsWindowVisible(child);
 
-            IntPtr deeper = FindChildRecursive(child, targetClass);
-            if (deeper != IntPtr.Zero) return deeper;
+            if (cls.Equals("RichEditD2DPT", StringComparison.OrdinalIgnoreCase))
+                candidates.Add((child, cls, 100, visible));
+            else if (cls.Equals("Edit", StringComparison.OrdinalIgnoreCase))
+                candidates.Add((child, cls, 90, visible));
+            else if (cls.Contains("RichEdit", StringComparison.OrdinalIgnoreCase))
+                candidates.Add((child, cls, 85, visible));
+            else if (cls.Contains("Scintilla", StringComparison.OrdinalIgnoreCase))
+                candidates.Add((child, cls, 80, visible));
+            else if (cls.Equals("_WwG", StringComparison.OrdinalIgnoreCase))
+                candidates.Add((child, cls, 75, visible));
+            else if (cls.Contains("RenderWidgetHost", StringComparison.OrdinalIgnoreCase))
+                candidates.Add((child, cls, 60, visible));
+
+            return true;
+        }, IntPtr.Zero);
+
+        if (candidates.Count > 0)
+        {
+            var best = candidates.OrderByDescending(c => c.Visible).ThenByDescending(c => c.Priority).First();
+            return (best.Hwnd, best.ClassName);
         }
-        return IntPtr.Zero;
+
+        // 3. Fallback: query focused child window via thread attachment
+        uint tid = Win32Api.GetWindowThreadProcessId(topHwnd, out _);
+        if (tid != 0)
+        {
+            uint curTid = Win32Api.GetCurrentThreadId();
+            if (Win32Api.AttachThreadInput(curTid, tid, true))
+            {
+                try
+                {
+                    IntPtr focus = Win32Api.GetFocus();
+                    if (focus != IntPtr.Zero && focus != topHwnd)
+                    {
+                        var sb = new StringBuilder(256);
+                        Win32Api.GetClassName(focus, sb, sb.Capacity);
+                        return (focus, sb.ToString());
+                    }
+                }
+                finally
+                {
+                    Win32Api.AttachThreadInput(curTid, tid, false);
+                }
+            }
+        }
+
+        return (topHwnd, className);
     }
 }

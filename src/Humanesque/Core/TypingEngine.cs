@@ -77,9 +77,8 @@ public class TypingEngine
         // Initialize and prepare injection channel
         _dispatcher.PrepareTarget(target);
 
-        // If using FocusSendInput mode or auto-detecting a non-Word window, give a clean countdown and focus window
-        bool requiresFocus = _dispatcher.ActiveMode == InjectionMode.FocusSendInput ||
-                             (_dispatcher.ActiveMode == InjectionMode.AutoDetect && !target.ProcessName.Equals("WINWORD", StringComparison.OrdinalIgnoreCase));
+        // Only explicit FocusSendInput mode requires window activation and countdown
+        bool requiresFocus = _dispatcher.ActiveMode == InjectionMode.FocusSendInput;
 
         if (requiresFocus && countdownSeconds > 0)
         {
@@ -93,7 +92,7 @@ public class TypingEngine
                 await Task.Delay(1000, token);
             }
 
-            // Bring target window to foreground
+            // Bring target window to foreground only in FocusSendInput mode
             InputDispatcher.ActivateWindow(target.Handle);
             await Task.Delay(250, token);
         }
