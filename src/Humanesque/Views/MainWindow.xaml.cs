@@ -88,7 +88,7 @@ public partial class MainWindow : Window
 
     private void OnInjectionModeChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (DataContext is MainViewModel vm && ComboMode.SelectedItem is ComboBoxItem item)
+        if (sender is ComboBox cb && cb.SelectedItem is ComboBoxItem item && DataContext is MainViewModel vm)
         {
             string? tag = item.Tag as string;
             vm.ActiveInjectionMode = tag switch

@@ -1,3 +1,4 @@
+using System.IO;
 using System.Windows;
 using Humanesque.Services;
 using Humanesque.Views;
@@ -8,10 +9,32 @@ public partial class App : Application
 {
     private readonly ConfigurationService _configService = new();
 
+    public App()
+    {
+        string logDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Humanesque");
+        Directory.CreateDirectory(logDir);
+
+        DispatcherUnhandledException += (s, e) =>
+        {
+            try
+            {
+                File.WriteAllText(Path.Combine(logDir, "crash.log"), e.Exception.ToString());
+            }
+            catch { }
+        };
+        AppDomain.CurrentDomain.UnhandledException += (s, e) =>
+        {
+            try
+            {
+                File.WriteAllText(Path.Combine(logDir, "crash_domain.log"), e.ExceptionObject.ToString());
+            }
+            catch { }
+        };
+    }
+
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
-        ShutdownMode = ShutdownMode.OnExplicitShutdown;
 
         var settings = _configService.LoadSettings();
 
@@ -24,10 +47,5 @@ public partial class App : Application
             settings.IsFirstRun = false;
             _configService.SaveSettings(settings);
         }
-
-        var mainWindow = new MainWindow();
-        MainWindow = mainWindow;
-        ShutdownMode = ShutdownMode.OnMainWindowClose;
-        mainWindow.Show();
     }
 }
